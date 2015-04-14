@@ -95,6 +95,9 @@ class bins_feature(feature):
 
     @classmethod
     def from_boundaries(cls, boundaries):
-        return bins_feature([interval_bin(low,high) for (low,high) in itertools.izip(boundaries[0:-1],boundaries[1:])])
+        """
+        doesn't make bin for last window
+        """
+        return bins_feature([interval_bin(low,high) for (low,high) in itertools.izip(boundaries[0:-2],boundaries[1:-1])])
 
 
