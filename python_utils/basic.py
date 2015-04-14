@@ -1,6 +1,7 @@
 import functools
 import json
 import types
+import decorators
 
 class my_object(object):
 
@@ -51,6 +52,7 @@ def display_fig_inline(fig):
     fig.savefig(output, format='png')
     img = Image(output.getvalue())
     display(img)
+    return fig
 
 def is_iterable(obj):
     try:
@@ -60,6 +62,30 @@ def is_iterable(obj):
     else:
         return True
 
+class fig_archiver(object):
+
+    def __init__(self, folder):
+        self.folder = folder
+        self.counter = 0
+
+    def __call__(self, fig):
+        import os, pdb
+        try:
+            os.makedirs(self.folder)
+        except Exception,e:
+            print e
+        fig.savefig('%s/%d' % (self.folder, self.counter))
+        self.counter += 1
+        return fig
+
+def compose(f, g):
+
+    def h(*args, **kwargs):
+        return f(g(*args, **kwargs))
+
+    return h
+        
+    
 def get_grid_fig_axes(n_rows, n_cols, n):
     import matplotlib.pyplot as plt
     per_fig = n_rows * n_cols
@@ -77,3 +103,40 @@ def get_grid_fig_axes(n_rows, n_cols, n):
         fig.tight_layout()
         figs.append(fig)
     return figs, axes
+
+
+class static_var_fxn_decorator(decorators.fxn_decorator):
+
+    def __init__(self, var_name, value):
+        self.var_name, self.value = var_name, value
+
+    def __call__(self, f):
+        setattr(f, self.var_name, self.value)
+
+
+def set_legend_unique_labels(ax, *args, **kwargs):
+    handles, labels = ax.get_legend_handles_labels()
+    unique_labels, unique_handles = zip(*(dict(zip(labels, handles)).iteritems()))
+    ax.legend(unique_handles, unique_labels, **kwargs)
+
+
+class raise_exception_fxn_decorator(decorators.fxn_decorator):
+
+    def __call__(self, f):
+        
+        @functools.wraps(f)
+        def wrapped_f(*args, **kwargs):
+            raise Exception
+
+        return wrapped_f
+    
+class raise_exception_method(decorators.decorated_method):
+
+    def __call__(self, inst, *args, **kwargs):
+        raise Exception
+
+    
+class raise_exception_method_decorator(decorators.method_decorator):
+
+    def __call__(self, f):
+        return raise_exception_method()
