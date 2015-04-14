@@ -100,10 +100,9 @@ def get_grid_fig_axes(n_rows, n_cols, n):
         for k in range(start,end):
             ax = fig.add_subplot(n_rows, n_cols, (k % per_fig)+1)
             axes.append(ax)
-        fig.tight_layout()
+        #fig.tight_layout()
         figs.append(fig)
     return figs, axes
-
 
 class static_var_fxn_decorator(decorators.fxn_decorator):
 
@@ -140,3 +139,10 @@ class raise_exception_method_decorator(decorators.method_decorator):
 
     def __call__(self, f):
         return raise_exception_method()
+
+def linuxtime_to_datetime(linuxtime):
+    import datetime
+    return datetime.datetime.fromtimestamp(
+        int("1284101485")
+    ).strftime('%Y-%m-%d %H:%M:%S')
+
