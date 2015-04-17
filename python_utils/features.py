@@ -46,6 +46,8 @@ def df_from_df_and_df_features(df_features, df):
     for (i,(val, df_feature)) in enumerate(itertools.izip(vals, df_features)):
         if isinstance(val, pd.Series):
             vals[i] = pd.DataFrame({repr(df_feature):val})
+        else:
+            
     return pd.concat(vals, axis=1)
 
 
