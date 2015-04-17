@@ -31,6 +31,14 @@ class pd_filter_transform(myTransformerMixin):
     def transform(self, x):
         return x.loc[x.apply(self.bool_f,axis=1)]
 
+class pd_filter_index_transform(myTransformerMixin):
+
+    def __init__(self, bool_f):
+        self.bool_f = bool_f
+
+    def transform(self, x):
+        return x.loc[map(self.bool_f, x.index.values)]
+    
 
 class pd_join_transform(myTransformerMixin):
 
