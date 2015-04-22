@@ -2,6 +2,7 @@ import pandas as pd
 import itertools
 from sklearn.base import TransformerMixin as TransformerMixin
 import numpy as np
+import pdb
 
 class myTransformerMixin(TransformerMixin):
 
@@ -23,6 +24,15 @@ class transform_from_fxn(myTransformerMixin):
         pass
 
 
+class vectorize_transform(myTransformerMixin):
+
+    def __init__(self, horse_transform):
+        self.horse_transform = horse_transform
+
+    def transform(self, X, y=None):
+        return np.array([self.horse_transform.transform(x) for x in X])
+
+    
 class pd_filter_transform(myTransformerMixin):
 
     def __init__(self, bool_f):
@@ -54,7 +64,6 @@ class zip_transform(myTransformerMixin):
     def transform(self, *args):
         return tuple([transform.transform(x) for (transform,x) in zip(self.transforms, args)])
 
-        
     
 def pd_train_test_split(X, y=None, test_size=0.5, random_state=0):
 
@@ -67,6 +76,37 @@ def pd_train_test_split(X, y=None, test_size=0.5, random_state=0):
     else:
         return X.iloc[in_train,:], X.iloc[in_test,:]
 
+
+class cross_val_sklearn_wrapper(myTransformerMixin):
+
+    def __init__(self, horse, cv_f):
+        self.horse, self.cv_f = horse, cv_f
+
+    def fit_predict(self, X, y):
+        """
+        divide into folds, predict each test_fold separately, save the models for each train_fold
+        """
+        pass
+
+    def fit(self, X, y):
+        """
+        train model based on each fold
+        """
+        pass
+
+    def predict(self, X):
+        """
+        return average prediction over each model.  X not assumed to have been in training
+        """
+        pass
+
+    def sample_train_info(self, idx):
+        """
+        idx refers to idx in data used for training.  has to figure out which fold idx was in and indx within that fold
+        """
+        pass
+    
+    
 def pd_predict_wrapper(predict_f):
         
     def wrapped_f(X_test):

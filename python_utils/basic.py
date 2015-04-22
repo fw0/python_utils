@@ -2,6 +2,9 @@ import functools
 import json
 import types
 import decorators
+import numpy as np
+import matplotlib.colors as mpl_colors
+import matplotlib.cm as cm
 
 class my_object(object):
 
@@ -146,3 +149,17 @@ def linuxtime_to_datetime(linuxtime):
         int("1284101485")
     ).strftime('%Y-%m-%d %H:%M:%S')
 
+def vals_to_rgbas(vals):
+
+    def get_elt_rank(l):
+        ans = np.zeros(len(l))
+        for (i,pos) in enumerate(np.argsort(l)):
+            ans[pos] = i
+        return np.array(ans)
+
+    vals = get_elt_rank(vals) / len(vals)
+    c = mpl_colors.Normalize()
+    c.autoscale(vals)
+    m = cm.ScalarMappable(norm=c, cmap=cm.cool)
+    colors = map(tuple,m.to_rgba(vals))
+    return colors
