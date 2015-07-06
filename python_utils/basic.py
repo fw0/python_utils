@@ -163,3 +163,24 @@ def vals_to_rgbas(vals):
     m = cm.ScalarMappable(norm=c, cmap=cm.cool)
     colors = map(tuple,m.to_rgba(vals))
     return colors
+
+import cProfile
+
+def do_cprofile(func):
+    def profiled_func(*args, **kwargs):
+        profile = cProfile.Profile()
+        try:
+            profile.enable()
+            result = func(*args, **kwargs)
+            profile.disable()
+            return result
+        finally:
+            profile.print_stats()
+    return profiled_func
+
+def plot_bar_chart(ax, labels, values, offset = 0, width = 0.75, label = None, alpha = 0.5, color = 'red'):
+    num = len(labels)
+    ax.bar(np.arange(num)+offset, values, label = label, alpha = alpha, color = color, width = width)
+    ax.set_xticks(np.arange(num) + 1.0/2)
+    ax.set_xticklabels(labels, rotation=90)
+    ax.set_xlim((0, num))
