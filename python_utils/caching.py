@@ -79,7 +79,11 @@ def get_temp_path(obj):
 
 def read_pickle(file_path):
     beg = time.time()
-    ans = pickle.load(open(file_path, 'rb'))
+    try:
+        ans = pickle.load(open(file_path, 'rb'))
+    except:
+        print file_path
+        pdb.set_trace()
     return ans
 
 
