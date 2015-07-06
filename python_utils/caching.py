@@ -46,7 +46,16 @@ def generic_get_arg_key(*args, **kwargs):
 
 
 def generic_get_key(identifier, *args, **kwargs):
-    return '%s%s' % (get_hash(identifier), get_hash((args, kwargs)))
+    ans = '%s%s' % (get_hash(identifier), get_hash((args, kwargs)))
+#    print args, ans
+    return ans
+
+
+def id_get_key(identifier, *args, **kwargs):
+    ans = str(map(id, args))
+#    print ans
+    return ans
+#    return '%s%s' % (get_hash(identifier), get_hash((args, kwargs)))
 
 def hash_get_key(identifier, *args, **kwargs):
 #    return hash(sum(map(hash, args + kwargs.values())))
@@ -194,15 +203,22 @@ class write_method_decorator(decorators.method_decorator):
 
 def cache(f, key_f, identifier, d, *args, **kwargs):
 #    return f(*args, **kwargs)
+    #print 'D before', [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()]
     if len(d) > cache_max_size:
         d.clear()
     key = key_f(identifier, *args, **kwargs)
+#    return f(*args, **kwargs)
     try:
-        return d[key]
+        ans = d[key]
+        #print 'compute OLD'
     except KeyError:
+        #print 'compute NEW'
         ans = f(*args, **kwargs)
         d[key] = ans
-        return ans
+    #print 'AFTER', id(d), [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()], args, key, ans
+    #print 'compare', f(*args, **kwargs), args[0], ans
+    #assert np.sum(f(*args, **kwargs) - args[0]) < .0001
+    return ans
 
 
 class cache_fxn_decorator(decorators.fxn_decorator):
@@ -210,9 +226,10 @@ class cache_fxn_decorator(decorators.fxn_decorator):
     def __init__(self, key_f):
         self.key_f = key_f
         self.d = {}
+        print key_f, 'key_f'
 
     def __call__(self, f):
-        
+        print 'wrapping', f
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
             return cache(f, self.key_f, basic_utils.get_callable_name(f), self.d, *args, **kwargs)
@@ -238,9 +255,9 @@ class cache_method_decorator(decorators.method_decorator):
 
 #import python_utils.utils as utils
 
-default_read_method_decorator = read_method_decorator(read_pickle, generic_get_path, 'pickle')
-default_write_method_decorator = write_method_decorator(write_pickle, generic_get_path, 'pickle')
-default_cache_method_decorator = cache_method_decorator(generic_get_key)
+default_read_method_decorator = lambda: read_method_decorator(read_pickle, generic_get_path, 'pickle')
+default_write_method_decorator = lambda: write_method_decorator(write_pickle, generic_get_path, 'pickle')
+default_cache_method_decorator = lambda: cache_method_decorator(generic_get_key)
 
 #default_everything_method_decorator = utils.multiple_composed_f(default_cache_method_decorator, default_read_method_decorator, default_write_method_decorator)
 """
@@ -249,9 +266,10 @@ default_cache_method_decorator = cache_method_decorator(generic_get_key)
 @caching.default_write_method_decorator
 """
 
-default_read_fxn_decorator = read_fxn_decorator(read_pickle, generic_get_path, 'pickle')
-default_write_fxn_decorator = write_fxn_decorator(write_pickle, generic_get_path, 'pickle')
-default_cache_fxn_decorator = cache_fxn_decorator(generic_get_key)
+default_read_fxn_decorator = lambda: read_fxn_decorator(read_pickle, generic_get_path, 'pickle')
+default_write_fxn_decorator = lambda: write_fxn_decorator(write_pickle, generic_get_path, 'pickle')
+default_cache_fxn_decorator = lambda: cache_fxn_decorator(generic_get_key)
+id_cache_fxn_decorator = lambda: cache_fxn_decorator(generic_get_key)
 #default_everything_fxn_decorator = utils.multiple_composed_f(default_cache_fxn_decorator, default_read_fxn_decorator, default_write_fxn_decorator)
 """
 @caching.default_cache_fxn_decorator
@@ -259,4 +277,4 @@ default_cache_fxn_decorator = cache_fxn_decorator(generic_get_key)
 @caching.default_write_fxn_decorator
 """
 
-hash_cache_method_decorator = cache_method_decorator(hash_get_key)
+hash_cache_method_decorator = lambda: cache_method_decorator(generic_get_key)
