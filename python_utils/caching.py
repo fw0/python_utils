@@ -19,15 +19,17 @@ before any functions are used, first have to set the constants module
 cache_folder = None
 which_hash_f = None
 cache_max_size = None
+fig_archiver = None
 
-def init(_cache_folder, _which_hash_f, _cache_max_size = 999999):
+def init(_cache_folder, _which_hash_f, _fig_archiver, _cache_max_size = 999999):
     global cache_folder
     global which_hash_f
     global cache_max_size
+    global fig_archiver
     cache_folder = _cache_folder
     which_hash_f = _which_hash_f
     cache_max_size = _cache_max_size
-
+    fig_archiver = _fig_archiver
 
 #@timeit_fxn_decorator
 def get_hash(obj):
@@ -115,6 +117,7 @@ class read_fxn_decorator(decorators.fxn_decorator):
 
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
+            print basic_utils.get_callable_name(f), 'gggggg'
             return read(f, self.read_f, self.path_f, basic_utils.get_callable_name(f), self.file_suffix, *args, **kwargs)
 
         return wrapped_f
@@ -202,7 +205,7 @@ class write_method_decorator(decorators.method_decorator):
         return write_decorated_method(f, self.write_f, self.path_f, self.file_suffix)
 
 def cache(f, key_f, identifier, d, *args, **kwargs):
-#    return f(*args, **kwargs)
+    return f(*args, **kwargs)
     #print 'D before', [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()]
     if len(d) > cache_max_size:
         d.clear()
@@ -210,9 +213,9 @@ def cache(f, key_f, identifier, d, *args, **kwargs):
 #    return f(*args, **kwargs)
     try:
         ans = d[key]
-        #print 'compute OLD'
+#        print 'compute OLD', f, args, kwargs
     except KeyError:
-        #print 'compute NEW'
+#        print 'compute NEW', f, args, kwargs
         ans = f(*args, **kwargs)
         d[key] = ans
     #print 'AFTER', id(d), [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()], args, key, ans
