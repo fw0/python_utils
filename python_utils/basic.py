@@ -70,6 +70,9 @@ class fig_archiver(object):
     def __init__(self, folder):
         self.folder = folder
         self.counter = 0
+        import shutil
+        shutil.rmtree(self.folder)
+
 
     def __call__(self, fig):
         import os, pdb
@@ -81,6 +84,84 @@ class fig_archiver(object):
         self.counter += 1
         return fig
 
+
+class archiver(object):
+    
+    def __init__(self, folder):
+        import os, pdb
+        self.folder = folder
+        self.counter = 0
+        try:
+            os.makedirs(self.folder)
+        except Exception,e:
+            print e
+        self.f = open('%s/log.txt' % self.folder, 'w')
+
+    def archive_fig(self, fig):
+        display_fig_inline(fig)
+        fig.savefig('%s/%d' % (self.folder, self.counter))
+        self.counter += 1
+        return fig
+
+    def archive_string(self, s):
+        f = open('%s/%d.txt' % (self.folder, self.counter), 'w')
+        f.write(s)
+        self.counter += 1
+        print s
+        f.close()
+        return s
+
+    def log_text(self, *s):
+        print s
+        self.f.write(str(s)+'\n')
+        self.f.flush()
+
+import copy_reg
+import types
+import multiprocessing
+
+
+def _pickle_method(m):
+    if m.im_self is None:
+        return getattr, (m.im_class, m.im_func.func_name)
+    else:
+        return getattr, (m.im_self, m.im_func.func_name)
+
+copy_reg.pickle(types.MethodType, _pickle_method)
+        
+def parallel_map(num_processes, f, iterable):
+    """                                                                                                                                                                                                    
+    make a                                                                                                                                                                                                 
+    """
+    import multiprocessing
+    #print iterable
+    print f
+    results = multiprocessing.Manager().list()
+    iterable_queue = multiprocessing.Queue()
+
+    def worker(_iterable_queue, _f, results_queue):
+        for arg in iter(_iterable_queue.get, None):
+            results_queue.append(_f(arg))
+
+    for x in iterable:
+        iterable_queue.put(x)
+
+    for i in xrange(num_processes):
+        iterable_queue.put(None)
+
+    workers = []
+
+    for i in xrange(num_processes):
+        p = multiprocessing.Process(target=worker, args=(iterable_queue, f, results))
+        p.start()
+        workers.append(p)
+
+    for p in workers:
+        p.join()
+
+    return [x for x in results]
+
+    
 def compose(f, g):
 
     def h(*args, **kwargs):
@@ -89,7 +170,7 @@ def compose(f, g):
     return h
         
     
-def get_grid_fig_axes(n_rows, n_cols, n):
+def get_grid_fig_axes(n_rows, n_cols, n, figsize=None):
     import matplotlib.pyplot as plt
     per_fig = n_rows * n_cols
     num_pages = (int(n) / per_fig) + (1 if (n % per_fig) > 0 else 0)
@@ -99,7 +180,10 @@ def get_grid_fig_axes(n_rows, n_cols, n):
         start = per_fig * i
         end = min(per_fig * (i+1), n)
         assert (end - start) > 0
-        fig = plt.figure()
+        if not (figsize is None):
+            fig = plt.figure(figsize=figsize)
+        else:
+            fig = plt.figure()
         for k in range(start,end):
             ax = fig.add_subplot(n_rows, n_cols, (k % per_fig)+1)
             axes.append(ax)
@@ -117,9 +201,12 @@ class static_var_fxn_decorator(decorators.fxn_decorator):
 
 
 def set_legend_unique_labels(ax, *args, **kwargs):
+    import operator
     handles, labels = ax.get_legend_handles_labels()
     unique_labels, unique_handles = zip(*(dict(zip(labels, handles)).iteritems()))
-    ax.legend(unique_handles, unique_labels, **kwargs)
+    hl = sorted(zip(unique_handles, unique_labels), key=operator.itemgetter(1))
+    sorted_handles, sorted_labels = zip(*hl)
+    ax.legend(sorted_handles, sorted_labels, **kwargs)
 
 
 class raise_exception_fxn_decorator(decorators.fxn_decorator):
@@ -149,18 +236,22 @@ def linuxtime_to_datetime(linuxtime):
         int("1284101485")
     ).strftime('%Y-%m-%d %H:%M:%S')
 
-def vals_to_rgbas(vals):
+def vals_to_rgbas(vals, cmap=cm.cool, vmin=None, vmax=None):
 
     def get_elt_rank(l):
         ans = np.zeros(len(l))
+        level = 0
         for (i,pos) in enumerate(np.argsort(l)):
+            if i > 0:
+                if ans[pos] > ans[pos-1]:
+                    level += 1
             ans[pos] = i
         return np.array(ans)
 
-    vals = get_elt_rank(vals) / len(vals)
-    c = mpl_colors.Normalize()
-    c.autoscale(vals)
-    m = cm.ScalarMappable(norm=c, cmap=cm.cool)
+    #vals = get_elt_rank(vals) / len(vals)
+    c = mpl_colors.Normalize(vmin=vmin, vmax=vmax)
+    #c.autoscale(vals)
+    m = cm.ScalarMappable(norm=c, cmap=cmap)
     colors = map(tuple,m.to_rgba(vals))
     return colors
 
@@ -186,3 +277,24 @@ def plot_bar_chart(ax, labels, values, offset = 0, width = 0.75, label = None, a
     ax.set_xlim((0, num))
     ax.tick_params(axis='both', which='major', labelsize=label_fontsize)
     ax.tick_params(axis='both', which='minor', labelsize=label_fontsize)
+
+def edit_distance(target, source):
+    """
+    Computes the min edit distance from target to source. Figure 3.25
+    """
+    n = len(target)
+    m = len(source)
+    print target, source
+    insertCost = lambda x:1
+    deleteCost = lambda x:1
+    substCost = lambda x,y:1
+    distance = [[0 for i in range(m+1)] for j in range(n+1)]
+    for i in range(1,n+1):
+        distance[i][0] = distance[i-1][0] + insertCost(target[i-1])
+    for j in range(1,m+1):
+        distance[0][j] = distance[0][j-1] + deleteCost(source[j-1])
+    for i in range(1,n+1):
+        for j in range(1,m+1):
+           distance[i][j] = min(distance[i-1][j]+1,distance[i][j-1]+1, distance[i-1][j-1]+substCost(source[j-1],target[i-1]))
+    return distance[n][m]
+
