@@ -178,9 +178,11 @@ def do_cprofile(func):
             profile.print_stats()
     return profiled_func
 
-def plot_bar_chart(ax, labels, values, offset = 0, width = 0.75, label = None, alpha = 0.5, color = 'red'):
+def plot_bar_chart(ax, labels, values, offset = 0, width = 0.75, label = None, alpha = 0.5, color = 'red', label_fontsize=None):
     num = len(labels)
     ax.bar(np.arange(num)+offset, values, label = label, alpha = alpha, color = color, width = width)
     ax.set_xticks(np.arange(num) + 1.0/2)
     ax.set_xticklabels(labels, rotation=90)
     ax.set_xlim((0, num))
+    ax.tick_params(axis='both', which='major', labelsize=label_fontsize)
+    ax.tick_params(axis='both', which='minor', labelsize=label_fontsize)
