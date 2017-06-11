@@ -200,13 +200,13 @@ class static_var_fxn_decorator(decorators.fxn_decorator):
         setattr(f, self.var_name, self.value)
 
 
-def set_legend_unique_labels(ax, *args, **kwargs):
+def set_legend_unique_labels(ax, prop, **legend_kwargs):
     import operator
     handles, labels = ax.get_legend_handles_labels()
     unique_labels, unique_handles = zip(*(dict(zip(labels, handles)).iteritems()))
     hl = sorted(zip(unique_handles, unique_labels), key=operator.itemgetter(1))
     sorted_handles, sorted_labels = zip(*hl)
-    ax.legend(sorted_handles, sorted_labels, **kwargs)
+    ax.legend(sorted_handles, sorted_labels, prop=prop, **legend_kwargs)
 
 
 class raise_exception_fxn_decorator(decorators.fxn_decorator):
