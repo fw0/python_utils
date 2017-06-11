@@ -55,6 +55,10 @@ def display_fig_inline(fig):
     fig.savefig(output, format='png')
     img = Image(output.getvalue())
     display(img)
+    import matplotlib.pyplot as plt
+#    import caching
+#    caching.fig_archiver.archive_fig(fig)
+    plt.close()
     return fig
 
 def is_iterable(obj):
@@ -98,10 +102,11 @@ class archiver(object):
         self.f = open('%s/log.txt' % self.folder, 'w')
 
     def archive_fig(self, fig):
-        display_fig_inline(fig)
-        fig.savefig('%s/%d' % (self.folder, self.counter))
-        self.counter += 1
-        return fig
+        if True:
+            display_fig_inline(fig)
+            fig.savefig('%s/%d' % (self.folder, self.counter))
+            self.counter += 1
+            return fig
 
     def archive_string(self, s):
         f = open('%s/%d.txt' % (self.folder, self.counter), 'w')
@@ -112,9 +117,24 @@ class archiver(object):
         return s
 
     def log_text(self, *s):
-        print s
-        self.f.write(str(s)+'\n')
-        self.f.flush()
+        if False:
+            print s
+            self.f.write(str(s)+'\n')
+            self.f.flush()
+
+    def fig_text(self, ss):
+        if False:
+            import matplotlib.pyplot as plt
+            import string
+            fig, ax = plt.subplots()
+            for s in ss:
+                self.log_text(s)
+            ax.text(0.,0., string.join(map(str,ss), sep='\n'), multialignment='left', horizontalalignment='left', verticalalignment='bottom', wrap=True)
+            fig.tight_layout()
+            import caching
+            caching.fig_archiver.archive_fig(fig)
+        #display_fig_inline(fig)
+        
 
 import copy_reg
 import types
@@ -128,6 +148,13 @@ def _pickle_method(m):
         return getattr, (m.im_self, m.im_func.func_name)
 
 copy_reg.pickle(types.MethodType, _pickle_method)
+
+def joblib_parallel_map(num_processes, verbose, f, iterable):
+
+    import joblib
+#    return joblib.Parallel(n_jobs=num_processes, verbose=verbose)(joblib.delayed(f)(x) for x in iterable)
+    return joblib.Parallel(n_jobs=num_processes, verbose=verbose, backend='threading')(joblib.delayed(f)(x) for x in iterable)
+
         
 def parallel_map(num_processes, f, iterable):
     """                                                                                                                                                                                                    
@@ -255,19 +282,27 @@ def vals_to_rgbas(vals, cmap=cm.cool, vmin=None, vmax=None):
     colors = map(tuple,m.to_rgba(vals))
     return colors
 
-import cProfile
 
-def do_cprofile(func):
-    def profiled_func(*args, **kwargs):
-        profile = cProfile.Profile()
-        try:
-            profile.enable()
-            result = func(*args, **kwargs)
-            profile.disable()
-            return result
-        finally:
-            profile.print_stats()
-    return profiled_func
+import cProfile, pstats, StringIO
+
+def do_cprofile(sort_by='tottime'):
+    def wrapper(func):
+        def profiled_func(*args, **kwargs):
+            profile = cProfile.Profile()
+            try:
+                profile.enable()
+                result = func(*args, **kwargs)
+                profile.disable()
+                return result
+            finally:
+                s = StringIO.StringIO()
+                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
+                ps.print_stats()
+                print s.getvalue()
+#                print s.getvalue()
+#            profile.print_stats()
+        return profiled_func
+    return wrapper
 
 def plot_bar_chart(ax, labels, values, offset = 0, width = 0.75, label = None, alpha = 0.5, color = 'red', label_fontsize=None):
     num = len(labels)
@@ -297,3 +332,24 @@ def edit_distance(target, source):
         for j in range(1,m+1):
            distance[i][j] = min(distance[i-1][j]+1,distance[i][j-1]+1, distance[i-1][j-1]+substCost(source[j-1],target[i-1]))
     return distance[n][m]
+
+def scatter(xs, ys, plot_dim=0, colors=None):
+    import matplotlib.pyplot as plt
+    xs, ys = np.array(xs), np.array(ys)
+    fig, ax = plt.subplots()
+    plot_xs = xs if len(xs.shape)==1 else xs[:,plot_dim]
+    if colors is None:
+        ax.scatter(plot_xs, ys, s=5.,edgecolors='none')
+    else:
+        ax.scatter(plot_xs, ys, c=colors,s=5.,edgecolors='none')
+    display_fig_inline(fig)
+    
+def scatter_3d(xs, ys, zs, colors=None):
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(xs,ys,zs,c=colors,s=5.,edgecolors='none')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    display_fig_inline(fig)

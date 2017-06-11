@@ -31,8 +31,8 @@ class traces(traces_base):
         else:
             start_pos = ends[idx-1]
         end_pos = ends[idx]
-
-        return self.unpermuted[:,chain,start_pos:end_pos]
+        print start_pos, end_pos, 'asdf'
+        return self.unpermuted[:,chain,int(start_pos):int(end_pos)]
         
         # return 3d array if original param was a matrix
         if len(self.permuted[param].shape) == 2:

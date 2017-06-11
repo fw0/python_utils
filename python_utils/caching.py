@@ -219,15 +219,20 @@ class write_method_decorator(decorators.method_decorator):
 def cache(f, key_f, identifier, d, *args, **kwargs):
     #return f(*args, **kwargs)
     #print 'D before', [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()]
+#    pdb.set_trace()
     if len(d) > cache_max_size:
         d.clear()
+#    pdb.set_trace()
     key = key_f(identifier, *args, **kwargs)
 #    return f(*args, **kwargs)
     try:
+#        print 'good'#, key
         ans = d[key]
 #        print 'compute OLD', f, args, kwargs
     except KeyError:
+#        print 'gg'#, key
 #        print 'compute NEW', f, args, kwargs
+#        pdb.set_trace()
         ans = f(*args, **kwargs)
         d[key] = ans
     #print 'AFTER', id(d), [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()], args, key, ans
