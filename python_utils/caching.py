@@ -33,11 +33,18 @@ def init(_cache_folder, _which_hash_f, _fig_archiver, _cache_max_size = 999999):
 
 #@timeit_fxn_decorator
 def get_hash(obj):
+    import StringIO
     try:
-        pickle_s = pickle.dumps(obj)
+        f = StringIO.StringIO()
+        pickler = pickle.Pickler(f)
+        #pdb.set_trace()
+        pickler.dump(obj)
+        pickle_s = f.getvalue()
+        f.close()
+#        pickle_s = pickle.dumps(obj)
     except TypeError as e:
         print e
-        pdb.set_trace()
+#        pdb.set_trace()
     m = hashlib.new(which_hash_f)
     m.update(pickle_s)
     return m.hexdigest()
@@ -142,10 +149,15 @@ class read_method_decorator(decorators.method_decorator):
         return read_decorated_method(f, self.read_f, self.path_f, self.file_suffix)
 
 
+import threading
+the_lock = threading.Lock()
+
 def write_pickle(obj, file_path):
+    the_lock.acquire()
     f = open(file_path, 'wb')
     pickle.dump(obj, f)
     f.close()
+    the_lock.release()
 
 
 def write(f, write_f, path_f, identifier, file_suffix, *args, **kwargs):
@@ -205,7 +217,7 @@ class write_method_decorator(decorators.method_decorator):
         return write_decorated_method(f, self.write_f, self.path_f, self.file_suffix)
 
 def cache(f, key_f, identifier, d, *args, **kwargs):
-    return f(*args, **kwargs)
+    #return f(*args, **kwargs)
     #print 'D before', [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()]
     if len(d) > cache_max_size:
         d.clear()
