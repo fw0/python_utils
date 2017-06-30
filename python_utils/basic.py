@@ -5,6 +5,8 @@ import decorators
 import numpy as np
 import matplotlib.colors as mpl_colors
 import matplotlib.cm as cm
+import time
+
 
 class my_object(object):
 
@@ -117,23 +119,24 @@ class archiver(object):
         return s
 
     def log_text(self, *s):
-        if False:
+        if True:
             print s
             self.f.write(str(s)+'\n')
             self.f.flush()
 
     def fig_text(self, ss):
-        if False:
+        if True:
             import matplotlib.pyplot as plt
             import string
             fig, ax = plt.subplots()
+            self.log_text('fig_text #%d' % self.counter)
             for s in ss:
                 self.log_text(s)
             ax.text(0.,0., string.join(map(str,ss), sep='\n'), multialignment='left', horizontalalignment='left', verticalalignment='bottom', wrap=True)
             fig.tight_layout()
             import caching
             caching.fig_archiver.archive_fig(fig)
-        #display_fig_inline(fig)
+#        display_fig_inline(fig)
         
 
 import copy_reg
@@ -152,8 +155,8 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 def joblib_parallel_map(num_processes, verbose, f, iterable):
 
     import joblib
-#    return joblib.Parallel(n_jobs=num_processes, verbose=verbose)(joblib.delayed(f)(x) for x in iterable)
-    return joblib.Parallel(n_jobs=num_processes, verbose=verbose, backend='threading')(joblib.delayed(f)(x) for x in iterable)
+    return joblib.Parallel(n_jobs=num_processes, verbose=verbose)(joblib.delayed(f)(x) for x in iterable)
+#    return joblib.Parallel(n_jobs=num_processes, verbose=verbose, backend='threading')(joblib.delayed(f)(x) for x in iterable)
 
         
 def parallel_map(num_processes, f, iterable):
@@ -283,9 +286,43 @@ def vals_to_rgbas(vals, cmap=cm.cool, vmin=None, vmax=None):
     return colors
 
 
+def timeit(msg):
+
+    def timeit_horse(method):
+        
+        def timed(*args, **kw):
+            ts = time.time()
+            result = method(*args, **kw)
+            te = time.time()
+
+#            print '%r %4.4f sec' % \
+#                (method.__name__, te-ts), msg, 'gg'
+            import pdb
+#            pdb.set_trace()
+            return result
+
+        return timed
+
+    return timeit_horse
+
+def print_decorator(msg):
+    def wrapper(f):
+        def wrapped(*args, **kwargs):
+            def shape(x):
+                try:
+                    return x.shape
+                except:
+                    return 'no shape'
+#            print(msg), map(shape, args)
+            ans = f(*args, **kwargs)
+#            print ans
+            return ans
+        return wrapped
+    return wrapper
+
 import cProfile, pstats, StringIO
 
-def do_cprofile(sort_by='tottime'):
+def do_cprofile(sort_by):
     def wrapper(func):
         def profiled_func(*args, **kwargs):
             profile = cProfile.Profile()
@@ -296,7 +333,10 @@ def do_cprofile(sort_by='tottime'):
                 return result
             finally:
                 s = StringIO.StringIO()
-                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
+                print sort_by
+                import pdb
+#                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
+                ps = pstats.Stats(profile, stream=s).sort_stats(sort_by)
                 ps.print_stats()
                 print s.getvalue()
 #                print s.getvalue()
