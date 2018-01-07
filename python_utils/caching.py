@@ -88,6 +88,7 @@ def generic_get_path(identifier, *args, **kwargs):
             return iden.__name__
         else:
             return iden.__class__.__name__
+#    pdb.set_trace()
     return '%s/%s/%s' % (cache_folder, get_identifier_folder(identifier), generic_get_key(identifier, *args, **kwargs))
 
 
@@ -124,7 +125,7 @@ class read_fxn_decorator(decorators.fxn_decorator):
 
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
-            print basic_utils.get_callable_name(f), 'gggggg'
+#            print basic_utils.get_callable_name(f), 'gggggg'
             return read(f, self.read_f, self.path_f, basic_utils.get_callable_name(f), self.file_suffix, *args, **kwargs)
 
         return wrapped_f
