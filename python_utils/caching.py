@@ -298,3 +298,35 @@ id_cache_fxn_decorator = lambda: cache_fxn_decorator(generic_get_key)
 """
 
 hash_cache_method_decorator = lambda: cache_method_decorator(generic_get_key)
+
+def switched_decorator(horse, compute, recompute, reader=None, writer=None, get_path=None, suffix=None):
+
+    # TT, TF(makes no sense), FT, FF
+            
+    import basic
+        
+    read_dec = read_fxn_decorator(reader, get_path, suffix) if (not recompute) and (not (reader is None)) else basic.raise_exception_fxn_decorator(False)
+    write_dec = write_fxn_decorator(writer, get_path, suffix) if (not (writer is None)) else basic.raise_exception_fxn_decorator(False)
+            
+    @read_dec
+    @basic.raise_exception_fxn_decorator(not compute)
+    @write_dec
+    def decorated(*args):
+        return horse(*args)
+
+    return decorated
+
+def ignore_exception_map_wrapper(mapper, exception=basic.noCacheException):
+
+    def wrapped(f, iterable):
+
+        def wrapped_f(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except exception:
+                return None
+
+        ans = mapper(wrapped_f, iterable)
+        return [elt for elt in ans if not (elt is None)]
+
+    return wrapped
