@@ -6,6 +6,10 @@ import numpy as np
 import matplotlib.colors as mpl_colors
 import matplotlib.cm as cm
 import time
+import os
+import imp
+import pdb
+import copy
 
 
 class my_object(object):
@@ -124,6 +128,11 @@ class archiver(object):
             self.f.write(str(s)+'\n')
             self.f.flush()
 
+    def log_text_s(self, s):
+        print s
+        self.f.write(str(s)+'\n')
+        self.f.flush()
+
     def fig_text(self, ss):
         if True:
             import matplotlib.pyplot as plt
@@ -238,6 +247,8 @@ def set_legend_unique_labels(ax, prop, **legend_kwargs):
     sorted_handles, sorted_labels = zip(*hl)
     ax.legend(sorted_handles, sorted_labels, prop=prop, **legend_kwargs)
 
+class noCacheException(Exception):
+    pass
 
 class raise_exception_fxn_decorator(decorators.fxn_decorator):
 
@@ -245,14 +256,14 @@ class raise_exception_fxn_decorator(decorators.fxn_decorator):
         
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
-            raise Exception
+            raise noCacheException
 
         return wrapped_f
     
 class raise_exception_method(decorators.decorated_method):
 
     def __call__(self, inst, *args, **kwargs):
-        raise Exception
+        raise noCacheException
 
     
 class raise_exception_method_decorator(decorators.method_decorator):
@@ -295,6 +306,7 @@ def timeit(msg):
             result = method(*args, **kw)
             te = time.time()
 
+            print '%s, %4.4f' % (msg, te-ts)
 #            print '%r %4.4f sec' % \
 #                (method.__name__, te-ts), msg, 'gg'
             import pdb
@@ -336,9 +348,14 @@ def do_cprofile(sort_by):
                 print sort_by
                 import pdb
 #                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
-                ps = pstats.Stats(profile, stream=s).sort_stats(sort_by)
+#                ps = pstats.Stats(profile, stream=s).sort_stats(sort_by)
+                ps = pstats.Stats(profile, stream=s).print_callers('dot')
                 ps.print_stats()
+                pdb.set_trace()
                 print s.getvalue()
+
+                pdb.set_trace()
+                ps.print_callers('dot')
 #                print s.getvalue()
 #            profile.print_stats()
         return profiled_func
@@ -393,3 +410,144 @@ def scatter_3d(xs, ys, zs, colors=None):
     ax.set_ylabel('y')
     ax.set_zlabel('z')
     display_fig_inline(fig)
+
+
+def relative_depth(path, child_path):
+    depth = 0
+    while True:
+        if child_path == '':
+            assert False
+        if path == child_path:
+            return depth
+        head, tail = os.path.split(child_path)
+        child_path = head
+        depth += 1
+    assert False
+
+
+def parent_import(path, name):
+    print 'import', path, name
+    while True:
+        if path == '/':
+            assert False
+        try:
+#            print 'ok', path, '%s/%s.py' % (path, name)
+            return imp.load_source(name, '%s/%s.py' % (path, name))
+        except IOError:
+            head, tail = os.path.split(path)
+            path = head
+    assert False
+
+
+def parent_find(path, file_name):
+    while True:
+        if path == '/':
+            assert False
+        _path, child_paths, file_names = os.walk(path).next()
+        if file_name in file_names:
+            return '%s/%s' % (path, file_name)
+        else:
+            head, tail = os.path.split(path)
+            path = head
+    assert False
+
+
+def crawl(paths, is_leaf, is_child, f=None, mapper=map):
+
+    def horse(path):
+        root_path = path
+        d = {}
+        queue = [path]
+        leaf_paths = []
+        while len(queue) != 0:
+            path = queue.pop()
+            if is_leaf(root_path, path):
+                leaf_paths.append(path)
+#            d[path] = f(path)
+            else:
+                _path, child_paths, file_names = os.walk(path).next()
+                assert path == _path
+                candidate_child_paths = ['%s/%s' % (path,child_path) for child_path in child_paths]
+                queue += [child_path for child_path in candidate_child_paths if is_child(root_path, child_path)]
+        return leaf_paths
+    if not isinstance(paths, str):
+        leaf_pathss = [horse(path) for path in paths]
+        leaf_paths = [path for leaf_paths in leaf_pathss for path in leaf_paths]
+    else:
+        leaf_paths = horse(paths)
+
+    if f is None:
+        return leaf_paths
+    else:
+        items = mapper(f, leaf_paths)
+        return dict(zip(leaf_paths, items))
+#    horse = lambda path: (path, f(path))
+#    horse.__dict__ = f.__dict__
+#    items = mapper(horse, leaf_paths)
+#    return dict(items)
+
+
+class node(object):
+
+    def __init__(self, attrs=None, children=None, parent=None):
+        if attrs is None:
+            attrs = {}
+        if children is None:
+            children = {}
+        self.attrs, self.children, self.parent = attrs, children, parent
+
+    def parent_edge_name(self):
+        assert not (self.parent is None)
+        for (edge_name, child) in self.parent.children.iteritems():
+            if child == self:
+                return edge
+        assert False
+
+
+def identical_tree(_node, children_list):
+#    _node = copy.copy(_node)
+    if len(children_list) == 0:
+        return _node
+    else:
+#        pdb.set_trace()
+        for (edge_name, child_attrs) in children_list[0].iteritems():
+            child = node(attrs=child_attrs)
+            _node.children[edge_name] = identical_tree(child, children_list[1:])
+            print '_____'
+            print _node 
+            print edge_name
+            print child_attrs
+            print _node.children
+            print '====='
+#        print 'children:', _node.children
+        return _node
+
+
+def write_directory_tree(path, _node):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    for (attr_name, attr) in _node.attrs.iteritems():
+        attr.to_file('%s/%s' % (path, attr_name))
+    for (edge_name, child) in _node.children.iteritems():
+        write_directory_tree('%s/%s' % (path, edge_name), child)
+
+
+class writeable_object(object):
+
+    def __init__(self, obj, display_name=None):
+        self.obj, self.display_name = obj, display_name
+
+    def to_file(self, path):
+        import inspect, string
+        f = open(path, 'w')
+        lines = inspect.getsourcelines(self.obj)[0]
+        if self.display_name is None:
+            f.write(lines[0])
+        else:
+            kind, rest = string.split(lines[0], maxsplit=1)
+            name, rest = string.split(rest, '(')
+            to_write = '%s %s(%s' % (kind, self.display_name, rest)
+            f.write(to_write)
+        for line in lines[1:]:
+            f.write(line)
+        f.close()
