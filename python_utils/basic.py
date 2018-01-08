@@ -252,11 +252,17 @@ class noCacheException(Exception):
 
 class raise_exception_fxn_decorator(decorators.fxn_decorator):
 
+    def __init__(self, active=True):
+        self.active = active
+    
     def __call__(self, f):
         
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
-            raise noCacheException
+            if self.active:
+                raise noCacheException
+            else:
+                return f(*args, **kwargs)
 
         return wrapped_f
     
@@ -411,7 +417,6 @@ def scatter_3d(xs, ys, zs, colors=None):
     ax.set_zlabel('z')
     display_fig_inline(fig)
 
-
 def relative_depth(path, child_path):
     depth = 0
     while True:
@@ -551,3 +556,70 @@ class writeable_object(object):
         for line in lines[1:]:
             f.write(line)
         f.close()
+
+def basic_map_getter(mode, profile='', splat=False):
+    from ipyparallel import Client
+    if mode != 'serial':
+        assert profile != ''
+        rc = Client(profile=profile)
+        #rc[:].use_dill()
+        rc[:].use_cloudpickle()
+    
+    if mode == 'direct':
+        dview = rc[:]
+        mapper = dview.map_sync
+    elif mode == 'balanced':
+        lview = rc.load_balanced_view()
+        mapper = lview.map_sync
+    elif mode == 'serial':
+        mapper = map
+
+    def splat_mapper(f, iterable):
+        def dec_f(args):
+            return f(*args)
+        return mapper(dec_f, iterable)
+
+    return mapper if splat else splat_mapper
+    
+def map_getter(mode, profile, compute, recompute):
+
+    def _constructor(reader=None, writer=None, get_path=None, suffix=None):
+        
+        
+        import python_utils.python_utils.caching as caching
+        mapper = basic_map_getter(mode, profile)
+        mapper = caching.igmore_exception_map_wrapper(mapper)
+    
+        def final(f, iterable):
+            decorated = caching.switched_decorator(f, compute, recompute, reader, writer, get_path, suffix)
+            return mapper(decorated, iterable)
+    
+        return final
+
+    return _constructor
+
+def parent_import_wrapper(path, s):
+    return getattr(parent_import(path, s), s)(path)
+
+def get_child_paths(path):
+    _path, child_paths, file_names = os.walk(path).next()
+    candidate_child_paths = ['%s/%s' % (path,child_path) for child_path in child_paths]
+    return candidate_child_paths
+#    actual_child_paths = [child_path for child_path in candidate_child_paths if is_child(root_path, child_path)]
+
+def hardcoded_crawl(paths, depth=None, f=None, mapper=map):
+
+    def is_child(path, cur_path):
+        head, tail = os.path.split(cur_path)
+        return (not (tail[0] in ['_','.'])) and (tail != 'cache')
+
+    def is_leaf(root_path, path):
+        if (not (depth is None)) and basic.relative_depth(root_path, path) == depth:
+            return True
+        else:
+            candidate_child_paths = get_child_paths(path)
+            actual_child_paths = [child_path for child_path in candidate_child_paths if is_child(root_path, child_path)]
+            return len(actual_child_paths) == 0
+
+    return crawl(paths, is_leaf, is_child, f, mapper)
+
