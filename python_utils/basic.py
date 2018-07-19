@@ -105,7 +105,7 @@ class archiver(object):
             os.makedirs(self.folder)
         except Exception,e:
             print e
-        self.f = open('%s/log.txt' % self.folder, 'w')
+        self.f = open('%s/log.txt' % self.folder, 'a')
 
     def archive_fig(self, fig):
         if True:
@@ -308,14 +308,14 @@ def timeit(msg):
     def timeit_horse(method):
         
         def timed(*args, **kw):
-            ts = time.time()
+            #ts = time.time()
             result = method(*args, **kw)
-            te = time.time()
+            #te = time.time()
 
-            print '%s, %4.4f' % (msg, te-ts)
+            #print '%s, %4.4f' % (msg, te-ts)
 #            print '%r %4.4f sec' % \
 #                (method.__name__, te-ts), msg, 'gg'
-            import pdb
+            #import pdb
 #            pdb.set_trace()
             return result
 
@@ -353,9 +353,9 @@ def do_cprofile(sort_by):
                 s = StringIO.StringIO()
                 print sort_by
                 import pdb
-#                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
+                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
 #                ps = pstats.Stats(profile, stream=s).sort_stats(sort_by)
-                ps = pstats.Stats(profile, stream=s).print_callers('dot')
+#                ps = pstats.Stats(profile, stream=s).print_callers('dot')
                 ps.print_stats()
                 pdb.set_trace()
                 print s.getvalue()
@@ -431,12 +431,12 @@ def relative_depth(path, child_path):
 
 
 def parent_import(path, name):
-    print 'import', path, name
+#    print 'importing', path, name
     while True:
         if path == '/':
             assert False
         try:
-#            print 'ok', path, '%s/%s.py' % (path, name)
+            print 'ok', path, '%s/%s.py' % (path, name)
             return imp.load_source(name, '%s/%s.py' % (path, name))
         except IOError:
             head, tail = os.path.split(path)
@@ -445,6 +445,7 @@ def parent_import(path, name):
 
 
 def parent_find(path, file_name):
+    print 'find', path
     while True:
         if path == '/':
             assert False
@@ -454,6 +455,7 @@ def parent_find(path, file_name):
         else:
             head, tail = os.path.split(path)
             path = head
+            print 'find', path, file_name
     assert False
 
 
@@ -557,7 +559,17 @@ class writeable_object(object):
             f.write(line)
         f.close()
 
-def basic_map_getter(mode, profile='', splat=False):
+class from_string_writeable_object(object):
+
+    def __init__(self, s):
+        self.s = s
+
+    def to_file(self, path):
+        f = open(path, 'w')
+        f.write(self.s)
+        f.close()
+
+def basic_map(mode, profile='', splat=False, exception_to_ignore=None):
     from ipyparallel import Client
     if mode != 'serial':
         assert profile != ''
@@ -574,29 +586,29 @@ def basic_map_getter(mode, profile='', splat=False):
     elif mode == 'serial':
         mapper = map
 
+    if not (exception_to_ignore is None):
+        import python_utils.python_utils.caching as caching
+        mapper = caching.ignore_exception_map_wrapper(mapper, noCacheException)
+
     def splat_mapper(f, iterable):
         def dec_f(args):
             return f(*args)
         return mapper(dec_f, iterable)
 
-    return mapper if splat else splat_mapper
+    return mapper if (not splat) else splat_mapper
     
-def map_getter(mode, profile, compute, recompute):
-
-    def _constructor(reader=None, writer=None, get_path=None, suffix=None):
+def cached_map(mode, profile, splat, compute, recompute, reader=None, writer=None, get_path=None, suffix=None):
         
         
-        import python_utils.python_utils.caching as caching
-        mapper = basic_map_getter(mode, profile)
-        mapper = caching.igmore_exception_map_wrapper(mapper)
+    import python_utils.python_utils.caching as caching
+    mapper = basic_map(mode, profile, splat)
+    mapper = caching.ignore_exception_map_wrapper(mapper, noCacheException)
     
-        def final(f, iterable):
-            decorated = caching.switched_decorator(f, compute, recompute, reader, writer, get_path, suffix)
-            return mapper(decorated, iterable)
+    def final(f, iterable):
+        decorated = caching.switched_decorator(f, compute, recompute, reader, writer, get_path, suffix)
+        return mapper(decorated, iterable)
     
-        return final
-
-    return _constructor
+    return final
 
 def parent_import_wrapper(path, s):
     return getattr(parent_import(path, s), s)(path)
@@ -623,3 +635,23 @@ def hardcoded_crawl(paths, depth=None, f=None, mapper=map):
 
     return crawl(paths, is_leaf, is_child, f, mapper)
 
+def str_to_bool(s):
+    if s == 'True':
+        return True
+    elif s == 'False':
+        return False
+    else:
+        assert False
+
+def intersect_dfs(dfs):
+    keys = iter(dfs).next().index
+    for df in dfs[1:]:
+        keys = keys.intersection(df.index)
+    return [df.loc[keys] for df in dfs]
+
+def my_arange(offset, step, total):
+    ans = np.arange(offset, abs(step), total)
+    if step < 0:
+        return reversed(ans)
+    else:
+        return ans
