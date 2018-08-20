@@ -1,7 +1,8 @@
 import os
 #import cPickle as pickle
 #import marshal as pickle
-import dill as pickle
+#import dill as pickle
+import pickle
 import hashlib
 import functools
 import pdb
@@ -17,7 +18,7 @@ import python_utils.python_utils.basic as basic_utils
 before any functions are used, first have to set the constants module
 """
 cache_folder = None
-which_hash_f = None
+which_hash_f = 'sha256'
 cache_max_size = None
 fig_archiver = None
 
@@ -45,6 +46,7 @@ def get_hash(obj):
     except TypeError as e:
         print e
 #        pdb.set_trace()
+        
     m = hashlib.new(which_hash_f)
     m.update(pickle_s)
     return m.hexdigest()
@@ -107,7 +109,11 @@ def read_pickle(file_path):
 
 
 def read(f, read_f, path_f, identifier, file_suffix, *args, **kwargs):
-    file_path = '%s.%s' % (path_f(identifier, *args, **kwargs), file_suffix)
+    if file_suffix is None:
+        file_path = path_f(identifier, *args, **kwargs)
+    else:
+        file_path = '%s.%s' % (path_f(identifier, *args, **kwargs), file_suffix)
+#    pdb.set_trace()
     if os.path.exists(file_path):
 #        print identifier, file_path, 'SUCCESS'
         return read_f(file_path)
@@ -168,13 +174,17 @@ def write(f, write_f, path_f, identifier, file_suffix, *args, **kwargs):
     write_f(ans, full_file_path)
     file_suffix can be None
     """
-    if file_suffix == None:
+    if file_suffix is None:
         file_path = path_f(identifier, *args, **kwargs)
     else:
         file_path = '%s.%s' % (path_f(identifier, *args, **kwargs), file_suffix)
     ans = f(*args, **kwargs)
     #print 'write', identifier, file_path, 
-    folder = os.path.dirname(file_path)
+#    pdb.set_trace()
+    if file_suffix is None:
+        folder = file_path # adopt convention that if file_suffix is None, path_F is a folder in which files are written
+    else:
+        folder = os.path.dirname(file_path)
     if not os.path.exists(folder):
         os.makedirs(folder)
     write_f(ans, file_path)
@@ -221,17 +231,16 @@ def cache(f, key_f, identifier, d, *args, **kwargs):
     #return f(*args, **kwargs)
     #print 'D before', [(key,id(val),id(val[0]),val) for (key,val) in d.iteritems()]
 #    pdb.set_trace()
-    if len(d) > cache_max_size:
-        d.clear()
-#    pdb.set_trace()
+#    if len(d) > cache_max_size:
+#        d.clear()
     key = key_f(identifier, *args, **kwargs)
 #    return f(*args, **kwargs)
     try:
-#        print 'good'#, key
         ans = d[key]
+#        print 'good', key
 #        print 'compute OLD', f, args, kwargs
     except KeyError:
-#        print 'gg'#, key
+#        print 'gg', key, d.keys()
 #        print 'compute NEW', f, args, kwargs
 #        pdb.set_trace()
         ans = f(*args, **kwargs)
@@ -259,20 +268,30 @@ class cache_fxn_decorator(decorators.fxn_decorator):
 
 class cache_decorated_method(decorators.decorated_method):
 
-    def __init__(self, f, key_f, d):
-        self.f, self.key_f, self.d = f, key_f, d
+#    def __init__(self, f, key_f, d): # fixed
+#        self.f, self.key_f, self.d = f, key_f, d # fixed
+
+    def __init__(self, f, key_f):
+        self.f, self.key_f = f, key_f
 
     def __call__(self, inst, *args, **kwargs):
-        return cache(functools.partial(self.f, inst), self.key_f, inst, self.d, *args, **kwargs)
+        try:
+            d = inst.__d__
+        except AttributeError:
+            inst.__d__ = {}
+            d = inst.__d__
+        return cache(functools.partial(self.f, inst), self.key_f, inst, d, *args, **kwargs)
+#        return cache(functools.partial(self.f, inst), self.key_f, inst, self.d, *args, **kwargs) # fixed
 
 class cache_method_decorator(decorators.method_decorator):
 
     def __init__(self, key_f):
         self.key_f = key_f
-        self.d = {}
+#        self.d = {} # fixed
 
     def __call__(self, f):
-        return cache_decorated_method(f, self.key_f, self.d)
+        return cache_decorated_method(f, self.key_f)
+#        return cache_decorated_method(f, self.key_f, self.d) fixed
 
 #import python_utils.utils as utils
 
@@ -300,15 +319,40 @@ id_cache_fxn_decorator = lambda: cache_fxn_decorator(generic_get_key)
 
 hash_cache_method_decorator = lambda: cache_method_decorator(generic_get_key)
 
-def switched_decorator(horse, compute, recompute, reader=None, writer=None, get_path=None, suffix=None):
+def with_cache_folder(cache_folder):
+
+    def get_dec(f):
+
+        def dec(*args, **kwargs):
+            import python_utils.python_utils.caching as caching
+            import python_utils.python_utils.basic as basic
+            old_cache_folder = caching.cache_folder
+            old_fig_archiver = caching.fig_archiver
+            caching.cache_folder = cache_folder
+            caching.fig_archiver = basic.archiver(cache_folder)
+            ans = f(*args, **kwargs)
+            caching.cache_folder = old_cache_folder
+            caching.fig_archiver = old_fig_archiver
+            return ans
+
+        return dec
+
+    return get_dec
+
+
+def switched_decorator(horse, compute=True, recompute=True, reader=None, writer=None, get_path=None, suffix=None, cache_folder=None, get_cache_key=None):
 
     # TT, TF(makes no sense), FT, FF
             
     import basic
-        
-    read_dec = read_fxn_decorator(reader, get_path, suffix) if (not recompute) and (not (reader is None)) else basic.raise_exception_fxn_decorator(False)
+
+    cache_dec = cache_fxn_decorator(get_cache_key) if not (get_cache_key is None) else basic.raise_exception_fxn_decorator(False)
+    with_cache_folder_dec = with_cache_folder(cache_folder) if not (cache_folder is None) else basic.raise_exception_fxn_decorator(False)
+    read_dec = read_fxn_decorator(reader, get_path, suffix) if ((not recompute) or (not compute)) and (not (reader is None)) else basic.raise_exception_fxn_decorator(False)
     write_dec = write_fxn_decorator(writer, get_path, suffix) if (not (writer is None)) else basic.raise_exception_fxn_decorator(False)
             
+    @cache_dec
+    @with_cache_folder_dec
     @read_dec
     @basic.raise_exception_fxn_decorator(not compute)
     @write_dec
@@ -317,7 +361,7 @@ def switched_decorator(horse, compute, recompute, reader=None, writer=None, get_
 
     return decorated
 
-def ignore_exception_map_wrapper(mapper, exception=basic.noCacheException):
+def ignore_exception_map_wrapper(mapper, exception=basic_utils.noCacheException):
 
     def wrapped(f, iterable):
 
