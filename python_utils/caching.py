@@ -107,10 +107,17 @@ def read_pickle(file_path):
 
 
 def read(f, read_f, path_f, identifier, file_suffix, *args, **kwargs):
-    file_path = '%s.%s' % (path_f(identifier, *args, **kwargs), file_suffix)
+    if file_suffix == None:
+        file_path = path_f(identifier, *args, **kwargs)
+    else:
+        file_path = '%s.%s' % (path_f(identifier, *args, **kwargs), file_suffix)
+#    file_path = '%s.%s' % (path_f(identifier, *args, **kwargs), file_suffix)
     if os.path.exists(file_path):
 #        print identifier, file_path, 'SUCCESS'
-        return read_f(file_path)
+        try:
+            return read_f(file_path, *args, **kwargs)
+        except TypeError:
+            return read_f(file_path)
     else:
 #        print identifier, file_path, 'NOT FOUND'
         return f(*args, **kwargs)
@@ -181,6 +188,14 @@ def write(f, write_f, path_f, identifier, file_suffix, *args, **kwargs):
 
     return ans
 
+def mkdir(file_path, is_file):
+    if is_file:
+        folder = os.path.dirname(file_path)
+    else:
+        folder = file_path
+#    print file_path, folder
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
 class write_fxn_decorator(decorators.fxn_decorator):
 
@@ -317,7 +332,7 @@ def switched_decorator(horse, compute, recompute, reader=None, writer=None, get_
 
     return decorated
 
-def ignore_exception_map_wrapper(mapper, exception=basic.noCacheException):
+def ignore_exception_map_wrapper(mapper, exception=basic_utils.noCacheException):
 
     def wrapped(f, iterable):
 
