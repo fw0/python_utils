@@ -1,7 +1,7 @@
 import functools
 import json
 import types
-import decorators
+import python_utils.python_utils.decorators as decorators
 import numpy as np
 import matplotlib.colors as mpl_colors
 import matplotlib.cm as cm
@@ -10,7 +10,8 @@ import os
 import imp
 import pdb
 import copy
-
+import datetime, itertools
+import pandas as pd
 
 class my_object(object):
 
@@ -54,17 +55,27 @@ def get_for_json(o):
                 ]
 
 def display_fig_inline(fig):
-    import StringIO
+#    import matplotlib.pyplot as plt
+#    plt.show(fig)
+#    fig.show()
+#    return fig
+    #import StringIO
+    from io import StringIO
+    import io
     from IPython.display import display
     from IPython.display import Image
-    output = StringIO.StringIO()
+    #output = StringIO.StringIO()
+    #output = StringIO()
+    output = io.BytesIO()
     fig.savefig(output, format='png')
     img = Image(output.getvalue())
-    display(img)
+    display(img, raw=False)
     import matplotlib.pyplot as plt
 #    import caching
 #    caching.fig_archiver.archive_fig(fig)
     plt.close()
+    import gc
+    gc.collect()
     return fig
 
 def is_iterable(obj):
@@ -81,6 +92,7 @@ class fig_archiver(object):
         self.folder = folder
         self.counter = 0
         import shutil
+        pdb.set_trace()
         shutil.rmtree(self.folder)
 
 
@@ -88,8 +100,8 @@ class fig_archiver(object):
         import os, pdb
         try:
             os.makedirs(self.folder)
-        except Exception,e:
-            print e
+        except Exception as e:
+            print(e)
         fig.savefig('%s/%d' % (self.folder, self.counter))
         self.counter += 1
         return fig
@@ -97,20 +109,44 @@ class fig_archiver(object):
 
 class archiver(object):
     
-    def __init__(self, folder):
+    def __init__(self, folder, time_subfolder=True):
+        if time_subfolder:
+            from datetime import datetime
+            now = datetime.now()
+            date_str = now.strftime("%Y-%m-%d-%H-%M-%S")
+            folder = '%s/%s' % (folder, date_str)
         import os, pdb
+        import shutil
+        #try:
+        #    shutil.rmtree(folder)
+        #except:
+        #    pass
         self.folder = folder
         self.counter = 0
         try:
             os.makedirs(self.folder)
-        except Exception,e:
-            print e
+        except Exception as e:
+            print(e)
         self.f = open('%s/log.txt' % self.folder, 'a')
+        self.f.write('LOG START AT ' + str(datetime.now()).split('.')[0])
 
-    def archive_fig(self, fig):
+    def archive_fig(self, fig, folder=None, name=None):
         if True:
             display_fig_inline(fig)
-            fig.savefig('%s/%d' % (self.folder, self.counter))
+            if folder is None:
+                _folder = self.folder
+            else:
+                _folder = '%s/%s' % (self.folder, folder)
+            try:
+                os.makedirs(_folder)
+            except Exception as e:
+                pass
+            if name is None:
+                _name = '%d_%s' % (self.counter, str(datetime.datetime.now()).split('.')[0])
+            else:
+                _name = '%d_%s_%s' % (self.counter, str(datetime.datetime.now()).split('.')[0], name)
+#            pdb.set_trace()
+            fig.savefig('%s/%s' % (_folder, _name))
             self.counter += 1
             return fig
 
@@ -118,18 +154,39 @@ class archiver(object):
         f = open('%s/%d.txt' % (self.folder, self.counter), 'w')
         f.write(s)
         self.counter += 1
-        print s
+        print(s)
         f.close()
         return s
 
-    def log_text(self, *s):
+    def log_text(self, *s, **kwargs):
         if True:
-            print s
-            self.f.write(str(s)+'\n')
-            self.f.flush()
+            if 'folder' in kwargs:
+                path = kwargs['folder']
+            else:
+                path = None
+            print(str(datetime.datetime.now()).split('.')[0], s)
+            if path is None:
+                _folder = self.folder
+            else:
+                _folder = '%s/%s' % (self.folder, path)
+            try:
+                os.makedirs(_folder)
+            except:
+                pass
+            if 'name' in kwargs:
+                path = '%s/%s' % (_folder, kwargs['name'])
+            else:
+                path = '%s/log.txt' % _folder
+            f = open(path, 'a')
+            if ('write_time' not in kwargs ) or ('write_time' in kwargs and kwargs['write_time']):
+                f.write(str(datetime.datetime.now()).split('.')[0] + str(s)+'\n')
+            else:
+                f.write(str(s)+'\n')
+            f.flush()
+            f.close()
 
     def log_text_s(self, s):
-        print s
+        print(s)
         self.f.write(str(s)+'\n')
         self.f.flush()
 
@@ -148,9 +205,10 @@ class archiver(object):
 #        display_fig_inline(fig)
         
 
-import copy_reg
+#import copy_reg
 import types
 import multiprocessing
+#import multiprocessing_on_dill as multiprocessing
 
 
 def _pickle_method(m):
@@ -159,7 +217,7 @@ def _pickle_method(m):
     else:
         return getattr, (m.im_self, m.im_func.func_name)
 
-copy_reg.pickle(types.MethodType, _pickle_method)
+#copy_reg.pickle(types.MethodType, _pickle_method)
 
 def joblib_parallel_map(num_processes, verbose, f, iterable):
 
@@ -172,9 +230,25 @@ def parallel_map(num_processes, f, iterable):
     """                                                                                                                                                                                                    
     make a                                                                                                                                                                                                 
     """
-    import multiprocessing
+#    import pathos.multiprocessing as multiprocessing
+#    import multiprocess as multiprocessing
     #print iterable
-    print f
+    print(f)
+    if num_processes is None:
+        return list(map(f, iterable))
+#    from pathos.multiprocessing import ProcessPool, ThreadPool
+
+#    from pathos.pp import ParallelPool
+#    pool = ParallelPool(nodes=num_processes)
+#    return pool.map(f, iterable)
+
+#    pool = ProcessPool(nodes=num_processes)
+#    pool = ThreadPool(num_processes)
+#    res = pool.map(f, iterable)
+#    return res
+
+
+
     results = multiprocessing.Manager().list()
     iterable_queue = multiprocessing.Queue()
 
@@ -185,12 +259,12 @@ def parallel_map(num_processes, f, iterable):
     for x in iterable:
         iterable_queue.put(x)
 
-    for i in xrange(num_processes):
+    for i in range(num_processes):
         iterable_queue.put(None)
 
     workers = []
 
-    for i in xrange(num_processes):
+    for i in range(num_processes):
         p = multiprocessing.Process(target=worker, args=(iterable_queue, f, results))
         p.start()
         workers.append(p)
@@ -308,11 +382,11 @@ def timeit(msg):
     def timeit_horse(method):
         
         def timed(*args, **kw):
-            #ts = time.time()
+            ts = time.time()
             result = method(*args, **kw)
-            #te = time.time()
+            te = time.time()
 
-            #print '%s, %4.4f' % (msg, te-ts)
+            print('%s, %4.4f' % (msg, te-ts))
 #            print '%r %4.4f sec' % \
 #                (method.__name__, te-ts), msg, 'gg'
             #import pdb
@@ -338,9 +412,20 @@ def print_decorator(msg):
         return wrapped
     return wrapper
 
-import cProfile, pstats, StringIO
+import cProfile, pstats
+#import StringIO
+
+def call_graph(func):
+
+    def wrapped(*args, **kwargs):
+        output="profile.png"
+        statsFileName="stats.pstats"
+        import cProfile 
+
 
 def do_cprofile(sort_by):
+#    import StringIO
+    import io
     def wrapper(func):
         def profiled_func(*args, **kwargs):
             profile = cProfile.Profile()
@@ -350,17 +435,28 @@ def do_cprofile(sort_by):
                 profile.disable()
                 return result
             finally:
-                s = StringIO.StringIO()
-                print sort_by
+
+
+ #               s = StringIO.StringIO()
+                s = io.StringIO()
+                print(sort_by)
                 import pdb
-                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
-#                ps = pstats.Stats(profile, stream=s).sort_stats(sort_by)
+#                s2 = StringIO.StringIO()
+                s2 = 'profile_output.txt'
+#                pdb.set_trace()
+                profile.dump_stats(s2)
+#                from graphviz import Source
+#                src = Source(s2)
+#                src.render('graph.png', view=True)  
+#                pdb.set_trace()
+#                ps = pstats.Stats(profile, stream=s).strip_dirs().sort_stats(sort_by)
+                ps = pstats.Stats(profile, stream=s).sort_stats(sort_by)
 #                ps = pstats.Stats(profile, stream=s).print_callers('dot')
                 ps.print_stats()
-                pdb.set_trace()
-                print s.getvalue()
+#                pdb.set_trace()
+                print(s.getvalue())
 
-                pdb.set_trace()
+#                pdb.set_trace()
                 ps.print_callers('dot')
 #                print s.getvalue()
 #            profile.print_stats()
@@ -382,7 +478,7 @@ def edit_distance(target, source):
     """
     n = len(target)
     m = len(source)
-    print target, source
+    print(target, source)
     insertCost = lambda x:1
     deleteCost = lambda x:1
     substCost = lambda x,y:1
@@ -436,7 +532,7 @@ def parent_import(path, name):
         if path == '/':
             assert False
         try:
-            print 'ok', path, '%s/%s.py' % (path, name)
+            print('ok', path, '%s/%s.py' % (path, name))
             return imp.load_source(name, '%s/%s.py' % (path, name))
         except IOError:
             head, tail = os.path.split(path)
@@ -445,7 +541,7 @@ def parent_import(path, name):
 
 
 def parent_find(path, file_name):
-    print 'find', path
+    print('find', path)
     while True:
         if path == '/':
             assert False
@@ -455,7 +551,7 @@ def parent_find(path, file_name):
         else:
             head, tail = os.path.split(path)
             path = head
-            print 'find', path, file_name
+            print('find', path, file_name)
     assert False
 
 
@@ -520,12 +616,12 @@ def identical_tree(_node, children_list):
         for (edge_name, child_attrs) in children_list[0].iteritems():
             child = node(attrs=child_attrs)
             _node.children[edge_name] = identical_tree(child, children_list[1:])
-            print '_____'
-            print _node 
-            print edge_name
-            print child_attrs
-            print _node.children
-            print '====='
+            print('_____')
+            print(_node )
+            print(edge_name)
+            print(child_attrs)
+            print(_node.children)
+            print('=====')
 #        print 'children:', _node.children
         return _node
 
@@ -616,6 +712,7 @@ def parent_import_wrapper(path, s):
 def get_child_paths(path):
     _path, child_paths, file_names = os.walk(path).next()
     candidate_child_paths = ['%s/%s' % (path,child_path) for child_path in child_paths]
+
     return candidate_child_paths
 #    actual_child_paths = [child_path for child_path in candidate_child_paths if is_child(root_path, child_path)]
 
@@ -634,6 +731,33 @@ def hardcoded_crawl(paths, depth=None, f=None, mapper=map):
             return len(actual_child_paths) == 0
 
     return crawl(paths, is_leaf, is_child, f, mapper)
+
+def build_build_notebook_log(log_folder, path):
+
+    def build_notebook_log(f):
+
+        import inspect, os
+#        path = inspect.getfile(inspect.stack()[1][0])
+#        print path, type(path), dir(inspect.getframeinfo(inspect.stack()[1][0]))
+#        pdb.set_trace()
+        path_folder, path_name = os.path.split(path)
+        import python_utils.python_utils.caching as caching
+        caching.mkdir(log_folder, False)
+#        log_path = '%s/%s-out.ipynb' % (log_folder, path_name)
+        log_path = '%s/%s-out.ipynb' % (path_folder, path_name)
+        print(log_path)
+        import python_utils.python_utils
+        import python_utils.python_utils.nbrun as nbrun
+        generic_notebook_folder, _ = os.path.split(python_utils.python_utils.__file__)
+        generic_notebook_path = '%s/generic_runner.ipynb' % generic_notebook_folder
+
+        def wrapped():
+            nbrun.run_notebook(generic_notebook_path, out_path_ipynb=log_path, nb_kwargs={'path':path}, hide_input=True, insert_pos=1, timeout=-1)
+
+
+        return wrapped
+
+    return build_notebook_log
 
 def str_to_bool(s):
     if s == 'True':
@@ -655,3 +779,142 @@ def my_arange(offset, step, total):
         return reversed(ans)
     else:
         return ans
+
+def get_arg_names(f):
+    import inspect
+    if isinstance(f, types.FunctionType):
+        return inspect.getargspec(f).args
+    elif isinstance(f, partial):
+        return [arg_name for arg_name in get_arg_names(f.f) if not (arg_name in f.kwargs)]
+    else:
+        raise NotImplementedError
+#        arg_name for arg_name in get_argnames(f.func) if (not (arg_name in f.keywords)) and (not (arg_name in))
+
+class partial(object):
+
+    def __init__(self, f, **kwargs):
+        self.f, self.kwargs = f, kwargs
+        
+    def __call__(self, *args, **kwargs):
+        # get argument names of f, fill in based on kwargs, and assume remaining arguments are in order
+        arg_names = get_arg_names(self.f)
+        _kwargs = {}
+        arg_pos = 0
+        for arg_name in arg_names:
+            if arg_name in self.kwargs:
+                _kwargs[arg_name] = self.kwargs[arg_name]
+            elif arg_pos < len(args):
+                _kwargs[arg_name] = args[arg_pos]
+                arg_pos += 1
+        for (key,val) in kwargs.iteritems():
+            _kwargs[key] = val
+        return self.f(**_kwargs)
+
+class my_partial(object):
+
+    def __init__(self, f, supply_arg_names=None, **kwargs):
+        import inspect
+        self.kwargs, self.f, self.supply_arg_names = kwargs, f, supply_arg_names
+#        pdb.set_trace()
+        self.arg_names = inspect.getargspec(f).args
+
+    def set_kwarg(self, key, val):
+        self.kwargs[key] = val
+
+    def __call__(self, *args):
+        if self.supply_arg_names is None:
+            arg_names = self.arg_names[-len(args):]
+        else:
+            arg_names = self.supply_arg_names
+        kwargs = {}
+        for key in self.kwargs:
+            kwargs[key] = self.kwargs[key]
+        for (arg,arg_name) in zip(args, arg_names):
+            kwargs[arg_name] = arg
+        return self.f(**kwargs)
+#        try:
+#            return self.f(**kwargs)
+#        except:
+#            pdb.set_trace()
+    
+def get(obj=None, attr=None, default=None, expr=None):
+    if not (expr is None):
+        try:
+            return expr()
+        except AttributeError:
+            return default
+    try:
+        return getattr(obj, attr)
+    except AttributeError:
+        return default
+
+def add_to_hierarchical_df(key_d, val_d, df):
+    # add levels to index
+    key_d = {key:val for (key,val) in key_d.items() if (key != 'not_kwargs') and (not (val is None))}
+    if df.size > 0:
+        for key in key_d.keys():
+            if not (key in df.index.names):
+                df = pd.concat([df], keys=[''], names=[key])
+    else:
+        try:
+            df = pd.DataFrame(index=pd.MultiIndex(levels=[[] for key in key_d.keys()], labels=[[] for key in key_d.keys()], names=[key for key in key_d.keys()]))
+        except:
+            df = pd.DataFrame(index=pd.MultiIndex(levels=[[] for key in key_d.keys()], codes=[[] for key in key_d.keys()], names=[key for key in key_d.keys()]))
+    tuple_key = tuple([key_d[key] if key in key_d else '' for key in df.index.names])
+    for (key, val) in val_d.items():
+#        pdb.set_trace()
+        if not tuple_key in df.index:
+            df.loc[tuple_key,:] = np.nan
+        if not key in df.columns:
+            df.insert(0, key, [np.nan for _ in range(len(df))])
+            if isinstance(val, np.ndarray):
+                df = df.astype({key:object})
+#        df.at[tuple_key, key] = val
+        #df.loc[tuple_key, key] = val
+        #print df
+        try:
+            df[key][tuple_key] = val
+        except:
+            df = df.astype({key:'O'})
+            df[key][tuple_key] = val
+        #try:
+        #    df.loc[key][tuple_key] = val
+#            df.loc[tuple_key, key] = val
+        #except:
+        #    pdb.set_trace()
+        #if (not tuple_key in df.index) and (not key in df.columns):
+        #    df.loc[tuple_key, key] = np.nan
+        #    df.loc[tuple_key, key] = val
+        #else:
+        #    pdb.set_trace()
+        #    df.loc[tuple_key, key] = val
+    return df
+
+def get_from_hierarchical_df(key_d, df):
+    tuple_key = tuple([key_d[key] if key in key_d else '' for key in df.index.names])
+    return df.loc[tuple_key]
+
+
+class results(object):
+
+    def __init__(self):
+        self.df = pd.DataFrame()
+
+    def add(self, val_d, **kwargs):
+        self.df = add_to_hierarchical_df(kwargs, val_d, self.df)
+
+    def get(self, key, **kwargs):
+        try:
+            ans = get_from_hierarchical_df(kwargs, self.df)[key]
+            try:
+                if np.isnan(ans):
+                    return None
+                else:
+                    return ans
+            except:
+                return ans
+        except KeyError:
+            return None
+
+    def relevant_df(self):
+        return self.df.loc[:,self.df.dtypes != object]
